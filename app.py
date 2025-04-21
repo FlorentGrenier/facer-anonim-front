@@ -22,3 +22,5 @@ gradio_ui = gr.Interface(
     title="Anonymiseur de texte",
     description="Utilise l'API interne pour anonymiser un texte et détecter les entités."
 )
+
+gradio_ui.launch(server_port=8080, server_name="0.0.0.0")
