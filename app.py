@@ -1,26 +1,90 @@
 import gradio as gr
-import requests
+import requests, os
 
-API_URL = "http://127.0.0.1:8000/anonym/anonymize?with_entity_ids=true"
+from dotenv import load_dotenv
+load_dotenv()
 
-def appeler_api(text):
+ROOT_URL = os.getenv("ROOT_URL")
+ANONYM_URL = f"{ROOT_URL}/anonym/anonymize?with_entity_ids=true"
+DEANONYM_URL = f"{ROOT_URL}/anonym/desanonymize"
+
+
+
+def anonymize(text):
     try:
-        response = requests.post(API_URL, json={"text": text})
+        response = requests.post(ANONYM_URL, json={"text": text})
         data = response.json()
         anonymized = data.get("anonymized_text", "")
         entities = data.get("entity_ids", {})
         formatted = "\n".join([f"{entity} → {label}" for entity, label in entities.items()])
-        return anonymized, formatted
+        return anonymized, entities, formatted
     except Exception as e:
-        return f"Erreur : {e}", ""
+        return f"Erreur : {e}", {}, ""
 
-gradio_ui = gr.Interface(
-    fn=appeler_api,
-    inputs=gr.Textbox(lines=8, label="Texte à anonymiser"),
-    outputs=[gr.Textbox(lines=8, label="Texte anonymisé"),
-             gr.Textbox(lines=6, label="Entités détectées")],
-    title="Anonymiseur de texte",
-    description="Utilise l'API interne pour anonymiser un texte et détecter les entités."
-)
+def desanonymize(text):
+    try:
+        response = requests.post(DEANONYM_URL, json={"text": text})
+        data = response.json()
+        return data.get("text", text)
+    except Exception as e:
+        return f"Erreur de désanonymisation : {e}"
+
+
+def process_message(message, history):
+    anonymized, entities, formatted = anonymize(message)
+
+    llm_response = f"Réponse désanonymisé: {anonymized}"
+
+   
+    deanonymized = desanonymize(llm_response)
+
+    history = history or []
+    history.append((message, deanonymized))
+
+    side_text = (
+        f"### Texte anonymisé\n{anonymized}\n\n"
+        f"### Entités détectées\n{formatted}\n\n"
+        f"### Texte désanonymisé\n{deanonymized}"
+    )
+
+    return history, history, side_text
+
+
+example_texts = [
+    "Bonjour, je m'appelle Florent et j'habite Toulouse.",
+    "Je travaille chez ValSoftware depuis 2021.",
+    "Mon numéro de téléphone est le 01 23 45 67 89.",
+]
+
+
+with gr.Blocks(title="Chatbot Anonymiseur") as gradio_ui:
+    with gr.Row():
+        with gr.Column(scale=1):
+            gr.Markdown("## Exemples")
+            example_box = gr.Textbox(visible=False)
+            for example in example_texts:
+                btn = gr.Button(example)
+                btn.click(lambda ex=example: ex, outputs=example_box)
+
+        with gr.Column(scale=2):
+            gr.Markdown("## Chatbot")
+            chatbot = gr.Chatbot()
+            user_input = gr.Textbox(label="Votre message")
+            send_btn = gr.Button("Envoyer")
+            state = gr.State([])
+            example_box.change(None, example_box, user_input, js="(i) => i")
+
+        with gr.Column(scale=1):
+            gr.Markdown("## Anonymisation")
+            side_info = gr.Markdown()
+
+    send_btn.click(
+        process_message,
+        [user_input, state],
+        [chatbot, state, side_info],
+    )
+
+    send_btn.click(None, None, user_input, js="() => ''")
+
 
 gradio_ui.launch(server_port=8080, server_name="0.0.0.0")
