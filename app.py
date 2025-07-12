@@ -31,24 +31,27 @@ def desanonymize(text):
 
 
 def process_message(message, history):
+    history = history or []
+
+    # 1) on stocke la requête utilisateur
+    history.append({"role": "user", "content": message})
+
+    # 2) on fait l’anonymisation / désanonymisation
     anonymized, entities, formatted = anonymize(message)
-
     llm_response = f"Réponse désanonymisé: {anonymized}"
-
-   
     deanonymized = desanonymize(llm_response)
 
-    history = history or []
-    history.append((message, deanonymized))
+    # 3) on stocke la réponse assistant
+    history.append({"role": "assistant", "content": deanonymized})
 
     side_text = (
         f"### Texte anonymisé\n{anonymized}\n\n"
-        f"### Entités détectées\n{formatted}\n\n"
-        f"### Texte désanonymisé\n{deanonymized}"
+        f"### Entités détectées\n"
+        + ("\n".join([f"{e} → {l}" for e, l in entities.items()])) +
+        f"\n\n### Texte désanonymisé\n{deanonymized}"
     )
 
     return history, history, side_text
-
 
 example_texts = [
     "Bonjour, je m'appelle Florent et j'habite Toulouse.",
@@ -68,7 +71,7 @@ with gr.Blocks(title="Chatbot Anonymiseur") as gradio_ui:
 
         with gr.Column(scale=2):
             gr.Markdown("## Chatbot")
-            chatbot = gr.Chatbot()
+            chatbot = gr.Chatbot(type="messages")
             user_input = gr.Textbox(label="Votre message")
             send_btn = gr.Button("Envoyer")
             state = gr.State([])
@@ -92,5 +95,6 @@ if __name__ == "__main__":
     gradio_ui.launch(
         server_name="0.0.0.0",
         server_port=port,
-        share=False
+        share=False,
+        debug=True
     )
