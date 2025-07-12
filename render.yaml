@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: gradio-app
+    name: chatbot-anonymiseur
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt

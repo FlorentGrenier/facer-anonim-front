@@ -87,4 +87,10 @@ with gr.Blocks(title="Chatbot Anonymiseur") as gradio_ui:
     send_btn.click(None, None, user_input, js="() => ''")
 
 
-gradio_ui.launch(server_port=8080, server_name="0.0.0.0")
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8080))
+    gradio_ui.launch(
+        server_name="0.0.0.0",
+        server_port=port,
+        share=False
+    )
